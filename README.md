@@ -10,6 +10,15 @@ extractfaces -source:"C:\source_directory" -destination:"C:\destination_director
 ```
 It will iterate over each photo in `C:\source_directory` and will generate an image corresponding to every face identified in them in `C:\destination_directory`.
 
+From this image
+
+![126-2679_IMG](https://user-images.githubusercontent.com/12274241/212491466-22716ea1-cdcf-4520-af0d-4d23c0f05991.JPG)
+
+It will generate those files
+
+![image](https://user-images.githubusercontent.com/12274241/212491571-41329422-1b21-4aba-a33f-263db34ce1a6.png)
+
+
 ## File parameters
 ### Source
 ```
@@ -17,13 +26,16 @@ It will iterate over each photo in `C:\source_directory` and will generate an im
                 OR 
 -source:"C:\directory1\directory2"
 ```
-The path to the source image to extract from or a directory name from which to extract all faces from all images.  Note that you should put the path between double quotes as in the exemple as a best practice.
+The path to the source image to extract from or a directory name from which to extract all faces from all images.  
+
+**NOTE**: that you should put the path between double quotes as in the exemple as a best practice.
 
 ### Destination
 ```
 -destination 
 ```
 The path to the directory where the new images will be created.  As for the source, please consider using the double quotes.
+
 **IMPORTANT** : do not place the destination directory as a child or sub child of the source directory as it might iterate indefinetly.
 
 ### Recursive
@@ -52,6 +64,11 @@ Will generate square image, that is that the width and height will be of same si
 ```
 Specify the persons that you want to keep.  It will match the name specified in the image metadata.  If none is specified, it will generate for everybody.
 
+**EXAMPLE**: If I specify -person:"Daniel Camiré|Valérie Camiré" in my previous example, I only generate those images
+
+![image](https://user-images.githubusercontent.com/12274241/212491656-697c7880-8acb-4bba-bedd-62fcdc582e5c.png)
+
+
 ### Percent
 ```
 -percent:"50|100|175|400"
@@ -62,6 +79,10 @@ It will generate an image for each percent specified.
 * 50 means that it will be 50% (hence smaller) centered on the face.  
 * 100 means that it will generate the exact region specified in the metadata
 * 400 means that it will generate a square 4x larger then what is specified in the metadata.  The face will be smaller within and you will gain more contexte from the surrounding.
+
+**EXAMPLE**: Still building on the same example, the setting `-percent:"50|100|175|400` yields those images
+
+![image](https://user-images.githubusercontent.com/12274241/212491739-271ec35f-2f3e-459e-877e-eeb1fb978fd6.png)
 
 
 ## Log parameters
