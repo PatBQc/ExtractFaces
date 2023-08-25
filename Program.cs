@@ -6,9 +6,12 @@ using MetadataExtractor.Formats.Mpeg;
 using MetadataExtractor.Formats.Xmp;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Formats.Tar;
 using System.Globalization;
 using System.IO;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Text;
 
 var commandArgs = InitializeCommandLineArgs(args);
 
@@ -61,6 +64,20 @@ CommandLineArgs InitializeCommandLineArgs(string[] args)
 
             case string s when s.StartsWith("-person"):
                 commandArgs.Persons = arg.Substring(8).Split('|').ToHashSet();
+                break;
+
+            case string s when s.StartsWith("-minsize"):
+                var sizes = arg.Substring(9).Split('x');
+                if(sizes.Length > 1)
+                {
+                    commandArgs.MinWidth = int.Parse(sizes[0]);
+                    commandArgs.MinHeight = int.Parse(sizes[1]);
+                }
+                else
+                {
+                    commandArgs.MinWidth = int.Parse(sizes[0]);
+                    commandArgs.MinHeight = int.Parse(sizes[0]);
+                }
                 break;
 
             case string s when s.StartsWith("-percent"):
@@ -120,36 +137,40 @@ CommandLineArgs InitializeCommandLineArgs(string[] args)
 
 static void ShowExif(IReadOnlyList<MetadataExtractor.Directory> directories)
 {
-    Console.WriteLine("All tags");
-    Console.WriteLine("=======================");
+    StringBuilder sb = new StringBuilder();
+    sb.AppendLine("All tags");
+    sb.AppendLine("=======================");
     foreach (var directory in directories)
     {
         foreach (var tag in directory.Tags)
         {
-            Console.WriteLine($"{directory.Name} - {tag.Name} = {tag.Description}");
+            sb.AppendLine($"{directory.Name} - {tag.Name} = {tag.Description}");
         }
     }
 
-    Console.WriteLine();
-    Console.WriteLine();
+    sb.AppendLine();
+    sb.AppendLine();
+    Console.WriteLine(sb.ToString());
 }
 
 static void ShowXmp(IReadOnlyList<MetadataExtractor.Directory> directories)
 {
-    Console.WriteLine("XMP Data");
-    Console.WriteLine("=======================");
+    StringBuilder sb = new StringBuilder();
+    sb.AppendLine("XMP Data");
+    sb.AppendLine("=======================");
     foreach (var directory in directories.OfType<XmpDirectory>())
     {
         foreach (var property in directory.XmpMeta.Properties)
         {
-            Console.WriteLine($"Path={property.Path}");
-            Console.WriteLine($"    Namespace={property.Namespace}");
-            Console.WriteLine($"    Value={property.Value}");
-            Console.WriteLine();
+            sb.AppendLine($"Path={property.Path}");
+            sb.AppendLine($"    Namespace={property.Namespace}");
+            sb.AppendLine($"    Value={property.Value}");
+            sb.AppendLine();
         }
     }
-    Console.WriteLine();
-    Console.WriteLine();
+    sb.AppendLine();
+    sb.AppendLine();
+    Console.WriteLine(sb.ToString());
 }
 
 void ExtractFacesFromImages(string source, string destination, CommandLineArgs args)
@@ -163,12 +184,14 @@ void ExtractFacesFromImages(string source, string destination, CommandLineArgs a
         }
         catch (Exception ex)
         {
-            Console.WriteLine();
-            Console.WriteLine(@"/!\ ERROR /!\");
-            Console.WriteLine(@"/!\ ERROR while extracting faces from an image: " + source);
-            Console.WriteLine(ex.ToString());
-            Console.WriteLine(@"/!\ ERROR /!\");
-            Console.WriteLine();
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine();
+            sb.AppendLine(@"/!\ ERROR /!\");
+            sb.AppendLine(@"/!\ ERROR while extracting faces from an image: " + source);
+            sb.AppendLine(ex.ToString());
+            sb.AppendLine(@"/!\ ERROR /!\");
+            sb.AppendLine();
+            Console.WriteLine(sb.ToString());
         }
     }
 
@@ -180,9 +203,10 @@ void ExtractFacesFromImages(string source, string destination, CommandLineArgs a
 
     if (System.IO.Directory.Exists(source))
     {
-        foreach (var filename in System.IO.Directory.EnumerateFiles(source).Where(_ => _.ToLower().EndsWith(".jpg")
+        Parallel.ForEach(System.IO.Directory.EnumerateFiles(source).Where(_ => _.ToLower().EndsWith(".jpg")
                                                                                    || _.ToLower().EndsWith(".jpeg")
-                                                                                   || _.ToLower().EndsWith(".png")))
+                                                                                   || _.ToLower().EndsWith(".png")),
+                          filename =>
         {
             try
             {
@@ -190,18 +214,20 @@ void ExtractFacesFromImages(string source, string destination, CommandLineArgs a
             }
             catch (Exception ex)
             {
-                Console.WriteLine();
-                Console.WriteLine(@"/!\ ERROR /!\");
-                Console.WriteLine(@"/!\ ERROR while extracting faces from an image: " + filename);
-                Console.WriteLine(ex.ToString());
-                Console.WriteLine(@"/!\ ERROR /!\");
-                Console.WriteLine();
+                StringBuilder sb = new StringBuilder();
+                sb.AppendLine();
+                sb.AppendLine(@"/!\ ERROR /!\");
+                sb.AppendLine(@"/!\ ERROR while extracting faces from an image: " + filename);
+                sb.AppendLine(ex.ToString());
+                sb.AppendLine(@"/!\ ERROR /!\");
+                sb.AppendLine();
+                Console.WriteLine(sb.ToString());
             }
-        }
+        });
 
         if (args.Recursive)
         {
-            foreach (var directory in System.IO.Directory.EnumerateDirectories(source))
+            Parallel.ForEach(System.IO.Directory.EnumerateDirectories(source), directory =>
             {
                 try
                 {
@@ -209,14 +235,16 @@ void ExtractFacesFromImages(string source, string destination, CommandLineArgs a
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine();
-                    Console.WriteLine(@"/!\ ERROR /!\");
-                    Console.WriteLine(@"/!\ ERROR while enumerating directory: " + directory);
-                    Console.WriteLine(ex.ToString());
-                    Console.WriteLine(@"/!\ ERROR /!\");
-                    Console.WriteLine();
+                    StringBuilder sb = new StringBuilder();
+                    sb.AppendLine();
+                    sb.AppendLine(@"/!\ ERROR /!\");
+                    sb.AppendLine(@"/!\ ERROR while enumerating directory: " + directory);
+                    sb.AppendLine(ex.ToString());
+                    sb.AppendLine(@"/!\ ERROR /!\");
+                    sb.AppendLine();
+                    Console.WriteLine(sb.ToString());
                 }
-            }
+            });
         }
     }
 
@@ -228,11 +256,11 @@ void ExtractFacesFromImage(string source, string destination, CommandLineArgs ar
     Prompt(args, "Reading Metadata from " + source);
     var directories = ImageMetadataReader.ReadMetadata(source);
 
-    if (args.ShowExif || args.Verbose)
-        ShowExif(directories);
+    //if (args.ShowExif || args.Verbose)
+    //    ShowExif(directories);
 
-    if (args.ShowXmp || args.Verbose)
-        ShowXmp(directories);
+    //if (args.ShowXmp || args.Verbose)
+    //    ShowXmp(directories);
 
     Dictionary<int, XmpPerson> dic = new Dictionary<int, XmpPerson>();
     foreach (var directory in directories.OfType<XmpDirectory>())
@@ -259,9 +287,7 @@ void ExtractFacesFromImage(string source, string destination, CommandLineArgs ar
     // https://stackoverflow.com/questions/180030/how-can-i-find-out-when-a-picture-was-actually-taken-in-c-sharp-running-on-vista
     // Find the so-called Exif "SubIFD" (which may be null)
     var subIfdDirectory = directories.OfType<ExifSubIfdDirectory>().FirstOrDefault();
-
-    // Read the DateTime tag value
-    var dateTaken = (DateTime)subIfdDirectory?.GetDateTime(ExifDirectoryBase.TagDateTimeOriginal);
+    DateTime dateTaken = GetDateTaken(source, subIfdDirectory);
 
     Prompt(args, "XMP person found in " + source);
     foreach (var x in dic)
@@ -305,10 +331,10 @@ void ExtractFacesFromImage(string source, string destination, CommandLineArgs ar
 
 
                 if (commandArgs.Flush)
-                    SaveFaceImage(args, destination, dateTaken, bmpSource, percentInt, person, flushRect, "Flush");
+                    SaveFaceImage(args, directories, destination, dateTaken, bmpSource, percentInt, person, flushRect, "Flush");
 
                 if (commandArgs.Square)
-                    SaveFaceImage(args, destination, dateTaken, bmpSource, percentInt, person, squareRect, "Square");
+                    SaveFaceImage(args, directories, destination, dateTaken, bmpSource, percentInt, person, squareRect, "Square");
             }
         }
     }
@@ -371,9 +397,42 @@ static void NormalizeRectInBorders(ref Rectangle rect, int width, int height, bo
     }
 }
 
-static void SaveFaceImage(CommandLineArgs args, string destination, DateTime dateTaken, Bitmap? bmpSource, int percentInt, XmpPerson person, Rectangle rect, string cropMode)
+static void SaveFaceImage(CommandLineArgs args, IReadOnlyList<MetadataExtractor.Directory>  directories, string destination, DateTime dateTaken, Bitmap? bmpSource, int percentInt, XmpPerson person, Rectangle rect, string cropMode)
 {
-    string filename = Path.Combine(destination,
+    if((args.MinWidth != -1 && args.MinWidth > rect.Width) || (args.MinHeight != -1 && args.MinHeight > rect.Height))
+    {
+        Prompt(args, "Skiping generating face file since rect to extract is smaller than minimum size");
+        Prompt(args, "    Person " + person.PersonDisplayName);
+        Prompt(args, "    Source " + rect);
+        Prompt(args, "    Percent " + percentInt + "%");
+        Prompt(args, "    Crop " + cropMode);
+        Prompt(args, "    MinSize " + args.MinWidth + "x" + args.MinHeight);
+
+        return;
+    }
+
+    if(rect.Right > bmpSource.Width || rect.Bottom > bmpSource.Height)
+    {
+        Prompt(args, "Skiping generating face file since rect to extract larger then the source material");
+        Prompt(args, "    Person " + person.PersonDisplayName);
+        Prompt(args, "    Source " + rect);
+        Prompt(args, "    Percent " + percentInt + "%");
+        Prompt(args, "    Crop " + cropMode);
+        Prompt(args, "    MinSize " + args.MinWidth + "x" + args.MinHeight);
+
+        return;
+    }
+
+    string dir = Path.Combine(destination, person.PersonDisplayName);
+
+    if (!System.IO.Directory.Exists(dir))
+    {
+        Prompt(args, "Creating directory " + dir);
+        System.IO.Directory.CreateDirectory(dir);
+    }
+
+
+    string filename = Path.Combine(dir,
                                     dateTaken.ToString("yyyy-MM-dd HH-mm-ss") +
                                     " - " + person.PersonDisplayName +
                                     " - " + cropMode +
@@ -386,7 +445,7 @@ static void SaveFaceImage(CommandLineArgs args, string destination, DateTime dat
     Prompt(args, "    Source " + rect);
     Prompt(args, "    Percent " + percentInt +"%");
     Prompt(args, "    Crop " + cropMode);
-    using (var bmpFace = bmpSource.Clone(rect, bmpSource.PixelFormat) as Bitmap)
+    using (var bmpFace = ImageOrientation(directories, bmpSource.Clone(rect, bmpSource.PixelFormat) as Bitmap))
     {
 
         bmpFace.Save(filename, ImageFormat.Jpeg);
@@ -397,4 +456,65 @@ static void Prompt(CommandLineArgs args, string message)
 {
     if (args.Verbose)
         Console.WriteLine(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " " + message);
+}
+
+static DateTime GetDateTaken(string source, ExifSubIfdDirectory? subIfdDirectory)
+{
+    DateTime dateTaken;
+
+    // Read the DateTime tag value from the first with one.  Using logical or (||) ensure that it will stop evaluation with 1st true
+    if (subIfdDirectory != null && 
+        (subIfdDirectory.TryGetDateTime(ExifDirectoryBase.TagDateTimeOriginal, out dateTaken) ||
+        subIfdDirectory.TryGetDateTime(ExifDirectoryBase.TagDateTimeDigitized, out dateTaken)  ||
+        subIfdDirectory.TryGetDateTime(ExifDirectoryBase.TagDateTime, out dateTaken)))
+    {
+        return dateTaken;
+    }
+
+    return System.IO.File.GetCreationTime(source);
+}
+
+
+
+// Adapted from: http://www.csharphelper.com/howtos/howto_orient_image.html
+// And from: https://stackoverflow.com/questions/71628565/problem-obtaining-orientation-using-metadataextractor-getdescription
+static Bitmap ImageOrientation(IReadOnlyList<MetadataExtractor.Directory> directories, Bitmap img)
+{
+    var ifd0Directory = directories.OfType<ExifIfd0Directory>().FirstOrDefault();
+    var orientation = ExifOrientations.Unknown;
+    if (ifd0Directory != null)
+    {
+        orientation = ifd0Directory.TryGetInt32(ExifDirectoryBase.TagOrientation, out int value) ? (ExifOrientations) value : ExifOrientations.Unknown;
+    }
+
+    // Orient the image.
+    switch (orientation)
+    {
+        case ExifOrientations.Unknown:
+        case ExifOrientations.TopLeft:
+            break;
+        case ExifOrientations.TopRight:
+            img.RotateFlip(RotateFlipType.RotateNoneFlipX);
+            break;
+        case ExifOrientations.BottomRight:
+            img.RotateFlip(RotateFlipType.Rotate180FlipNone);
+            break;
+        case ExifOrientations.BottomLeft:
+            img.RotateFlip(RotateFlipType.RotateNoneFlipY);
+            break;
+        case ExifOrientations.LeftTop:
+            img.RotateFlip(RotateFlipType.Rotate90FlipX);
+            break;
+        case ExifOrientations.RightTop:
+            img.RotateFlip(RotateFlipType.Rotate90FlipNone);
+            break;
+        case ExifOrientations.RightBottom:
+            img.RotateFlip(RotateFlipType.Rotate90FlipY);
+            break;
+        case ExifOrientations.LeftBottom:
+            img.RotateFlip(RotateFlipType.Rotate270FlipNone);
+            break;
+    }
+
+    return img;
 }

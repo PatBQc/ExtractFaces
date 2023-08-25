@@ -24,6 +24,10 @@ namespace ExtractFaces
 
         public int DestinationFilePrefix { get; set; } = 0;
 
+        public int MinWidth { get; set; } = -1;
+
+        public int MinHeight { get; set; } = -1;
+
         public string Source { get; set; } = null;
 
         public string Destination { get; set; } = null;
