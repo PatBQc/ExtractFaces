@@ -254,87 +254,92 @@ void ExtractFacesFromImage(string source, string destination, CommandLineArgs ar
 {
     // Read all metadata from the image
     Prompt(args, "Reading Metadata from " + source);
-    var directories = ImageMetadataReader.ReadMetadata(source);
-
-    //if (args.ShowExif || args.Verbose)
-    //    ShowExif(directories);
-
-    //if (args.ShowXmp || args.Verbose)
-    //    ShowXmp(directories);
-
-    Dictionary<int, XmpPerson> dic = new Dictionary<int, XmpPerson>();
-    foreach (var directory in directories.OfType<XmpDirectory>())
+    using (MemoryStream fileMemoryStream = new MemoryStream(File.ReadAllBytes(source)))
     {
-        foreach (var property in directory.XmpMeta.Properties.Where(_ => (_?.Path?.StartsWith(@"MP:RegionInfo/MPRI:Regions") ?? false) && ((_?.Path?.EndsWith(@"/MPReg:PersonDisplayName") ?? false) || (_?.Path?.EndsWith(@"/MPReg:Rectangle") ?? false))).OrderBy(_ => _.Path))
+        fileMemoryStream.Position = 0;
+        var directories = ImageMetadataReader.ReadMetadata(fileMemoryStream);
+
+        //if (args.ShowExif || args.Verbose)
+        //    ShowExif(directories);
+
+        //if (args.ShowXmp || args.Verbose)
+        //    ShowXmp(directories);
+
+        Dictionary<int, XmpPerson> dic = new Dictionary<int, XmpPerson>();
+        foreach (var directory in directories.OfType<XmpDirectory>())
         {
-            int index = int.Parse(property.Path.Replace("MP:RegionInfo/MPRI:Regions[", string.Empty).Replace("]/MPReg:Rectangle", string.Empty).Replace("]/MPReg:PersonDisplayName", string.Empty));
-            if (!dic.ContainsKey(index))
-                dic.Add(index, new XmpPerson());
-
-            if (property.Path.EndsWith("]/MPReg:Rectangle"))
+            foreach (var property in directory.XmpMeta.Properties.Where(_ => (_?.Path?.StartsWith(@"MP:RegionInfo/MPRI:Regions") ?? false) && ((_?.Path?.EndsWith(@"/MPReg:PersonDisplayName") ?? false) || (_?.Path?.EndsWith(@"/MPReg:Rectangle") ?? false))).OrderBy(_ => _.Path))
             {
-                var x = property.Value.Split(',').Select(_ => float.Parse(_, NumberStyles.Float, CultureInfo.InvariantCulture.NumberFormat)).ToArray();
-                dic[index].Rectangle = new RectangleF(x[0], x[1], x[2], x[3]);
-            }
+                int index = int.Parse(property.Path.Replace("MP:RegionInfo/MPRI:Regions[", string.Empty).Replace("]/MPReg:Rectangle", string.Empty).Replace("]/MPReg:PersonDisplayName", string.Empty));
+                if (!dic.ContainsKey(index))
+                    dic.Add(index, new XmpPerson());
 
-            if (property.Path.EndsWith("]/MPReg:PersonDisplayName"))
-            {
-                dic[index].PersonDisplayName = property.Value;
+                if (property.Path.EndsWith("]/MPReg:Rectangle"))
+                {
+                    var x = property.Value.Split(',').Select(_ => float.Parse(_, NumberStyles.Float, CultureInfo.InvariantCulture.NumberFormat)).ToArray();
+                    dic[index].Rectangle = new RectangleF(x[0], x[1], x[2], x[3]);
+                }
+
+                if (property.Path.EndsWith("]/MPReg:PersonDisplayName"))
+                {
+                    dic[index].PersonDisplayName = property.Value;
+                }
             }
         }
-    }
 
-    // https://stackoverflow.com/questions/180030/how-can-i-find-out-when-a-picture-was-actually-taken-in-c-sharp-running-on-vista
-    // Find the so-called Exif "SubIFD" (which may be null)
-    var subIfdDirectory = directories.OfType<ExifSubIfdDirectory>().FirstOrDefault();
-    DateTime dateTaken = GetDateTaken(source, subIfdDirectory);
+        // https://stackoverflow.com/questions/180030/how-can-i-find-out-when-a-picture-was-actually-taken-in-c-sharp-running-on-vista
+        // Find the so-called Exif "SubIFD" (which may be null)
+        var subIfdDirectory = directories.OfType<ExifSubIfdDirectory>().FirstOrDefault();
+        DateTime dateTaken = GetDateTaken(source, subIfdDirectory);
 
-    Prompt(args, "XMP person found in " + source);
-    foreach (var x in dic)
-    {
-        Prompt(args, x.Key + ": " + x.Value.PersonDisplayName + " --> " + x.Value.Rectangle.ToString());
-    }
-
-    Prompt(args, "Loading file content " + source);
-    using (var bmpSource = System.Drawing.Bitmap.FromFile(source) as Bitmap)
-    {
-        foreach (var percentInt in commandArgs.Percents)
+        Prompt(args, "XMP person found in " + source);
+        foreach (var x in dic)
         {
-            var percent = percentInt / 100.0;
+            Prompt(args, x.Key + ": " + x.Value.PersonDisplayName + " --> " + x.Value.Rectangle.ToString());
+        }
 
-            var persons = args.Persons == null ? dic.Values : dic.Values.Where(x => args.Persons.Contains(x.PersonDisplayName));
-
-            foreach (var person in persons)
+        Prompt(args, "Loading file content " + source);
+        fileMemoryStream.Position = 0;
+        using (var bmpSource = System.Drawing.Bitmap.FromStream(fileMemoryStream) as Bitmap)
+        {
+            foreach (var percentInt in commandArgs.Percents)
             {
-                Prompt(args, "Generating faces for " + person.PersonDisplayName);
-                Point center = new Point((int)((person.Rectangle.X + person.Rectangle.Width / 2) * bmpSource.Width),
-                                         (int)((person.Rectangle.Y + person.Rectangle.Height / 2) * bmpSource.Height));
+                var percent = percentInt / 100.0;
 
-                Point flushDelta = new Point((int)(person.Rectangle.Width * percent / 2 * bmpSource.Width),
-                                             (int)(person.Rectangle.Height * percent / 2 * bmpSource.Height));
+                var persons = args.Persons == null ? dic.Values : dic.Values.Where(x => args.Persons.Contains(x.PersonDisplayName));
 
-                var flushRect = new Rectangle(center.X - flushDelta.X,
-                                              center.Y - flushDelta.Y,
-                                              (int)(person.Rectangle.Width * percent * bmpSource.Width),
-                                              (int)(person.Rectangle.Height * percent * bmpSource.Height));
+                foreach (var person in persons)
+                {
+                    Prompt(args, "Generating faces for " + person.PersonDisplayName);
+                    Point center = new Point((int)((person.Rectangle.X + person.Rectangle.Width / 2) * bmpSource.Width),
+                                             (int)((person.Rectangle.Y + person.Rectangle.Height / 2) * bmpSource.Height));
 
-                NormalizeRectInBorders(ref flushRect, bmpSource.Width, bmpSource.Height, false);
+                    Point flushDelta = new Point((int)(person.Rectangle.Width * percent / 2 * bmpSource.Width),
+                                                 (int)(person.Rectangle.Height * percent / 2 * bmpSource.Height));
 
-                int longestSide = Math.Max(flushRect.Width, flushRect.Height);
+                    var flushRect = new Rectangle(center.X - flushDelta.X,
+                                                  center.Y - flushDelta.Y,
+                                                  (int)(person.Rectangle.Width * percent * bmpSource.Width),
+                                                  (int)(person.Rectangle.Height * percent * bmpSource.Height));
 
-                var squareRect = new Rectangle(center.X - longestSide / 2,
-                                               center.Y - longestSide / 2,
-                                               longestSide,
-                                               longestSide);
+                    NormalizeRectInBorders(ref flushRect, bmpSource.Width, bmpSource.Height, false);
 
-                NormalizeRectInBorders(ref squareRect, bmpSource.Width, bmpSource.Height, true);
+                    int longestSide = Math.Max(flushRect.Width, flushRect.Height);
+
+                    var squareRect = new Rectangle(center.X - longestSide / 2,
+                                                   center.Y - longestSide / 2,
+                                                   longestSide,
+                                                   longestSide);
+
+                    NormalizeRectInBorders(ref squareRect, bmpSource.Width, bmpSource.Height, true);
 
 
-                if (commandArgs.Flush)
-                    SaveFaceImage(args, directories, destination, dateTaken, bmpSource, percentInt, person, flushRect, "Flush");
+                    if (commandArgs.Flush)
+                        SaveFaceImage(args, directories, destination, dateTaken, bmpSource, percentInt, person, flushRect, "Flush");
 
-                if (commandArgs.Square)
-                    SaveFaceImage(args, directories, destination, dateTaken, bmpSource, percentInt, person, squareRect, "Square");
+                    if (commandArgs.Square)
+                        SaveFaceImage(args, directories, destination, dateTaken, bmpSource, percentInt, person, squareRect, "Square");
+                }
             }
         }
     }
