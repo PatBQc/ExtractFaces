@@ -2,7 +2,7 @@
   "profiles": {
     "ExtractFaces": {
       "commandName": "Project",
-      "commandLineArgs": "-showexif -showxmp -person=\"Daniel Camiré|Huguette Berthiaume|Valérie Camiré\" -square -flush -percent=50|100|150|200|400 -WaitKey -source:IMG_9284.JPG -destination:.\\output -verbose"
+      "commandLineArgs": "-showexif -showxmp -person=\"Daniel Camiré|Huguette Berthiaume|Valérie Camiré|Martine Camiré|Patrice Camiré|Patrick Bélanger|Jeanne Bélanger|Vincent Bélanger|Steve Labrecque|Frédérique Labrecque|Alexis Labrecque|Olivier Labrecque|Thomas Labrecque\" -square -flush -percent=50|100|150|200|250|400 -WaitKey \"-source:X:\\Images\\Canon Jeanne\\100CANON\\IMG_8562.JPG\" -destination:.\\output-3 -verbose -minSize:1024 -recursive"
     }
   }
 }
