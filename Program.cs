@@ -175,79 +175,34 @@ static void ShowXmp(IReadOnlyList<MetadataExtractor.Directory> directories)
 
 void ExtractFacesFromImages(string source, string destination, CommandLineArgs args)
 {
-    Prompt(args, "Visiting source directory " + source);
-    if (File.Exists(source))
-    {
-        try
-        {
-            ExtractFacesFromImage(source, destination, args);
-        }
-        catch (Exception ex)
-        {
-            StringBuilder sb = new StringBuilder();
-            sb.AppendLine();
-            sb.AppendLine(@"/!\ ERROR /!\");
-            sb.AppendLine(@"/!\ ERROR while extracting faces from an image: " + source);
-            sb.AppendLine(ex.ToString());
-            sb.AppendLine(@"/!\ ERROR /!\");
-            sb.AppendLine();
-            Console.WriteLine(sb.ToString());
-        }
-    }
-
     if (!System.IO.Directory.Exists(destination))
     {
         Prompt(args, "Creating directory " + destination);
         System.IO.Directory.CreateDirectory(destination);
     }
 
-    if (System.IO.Directory.Exists(source))
+    Prompt(args, "Visiting source directory " + source);
+    Parallel.ForEach(GetFiles(source), file =>
     {
-        Parallel.ForEach(System.IO.Directory.EnumerateFiles(source).Where(_ => _.ToLower().EndsWith(".jpg")
-                                                                                   || _.ToLower().EndsWith(".jpeg")
-                                                                                   || _.ToLower().EndsWith(".png")),
-                          filename =>
+        if (File.Exists(file))
         {
             try
             {
-                ExtractFacesFromImage(filename, destination, args);
+                ExtractFacesFromImage(file, destination, args);
             }
             catch (Exception ex)
             {
                 StringBuilder sb = new StringBuilder();
                 sb.AppendLine();
                 sb.AppendLine(@"/!\ ERROR /!\");
-                sb.AppendLine(@"/!\ ERROR while extracting faces from an image: " + filename);
+                sb.AppendLine(@"/!\ ERROR while extracting faces from an image: " + source);
                 sb.AppendLine(ex.ToString());
                 sb.AppendLine(@"/!\ ERROR /!\");
                 sb.AppendLine();
                 Console.WriteLine(sb.ToString());
             }
-        });
-
-        if (args.Recursive)
-        {
-            Parallel.ForEach(System.IO.Directory.EnumerateDirectories(source), directory =>
-            {
-                try
-                {
-                    ExtractFacesFromImages(directory, destination, args);
-                }
-                catch (Exception ex)
-                {
-                    StringBuilder sb = new StringBuilder();
-                    sb.AppendLine();
-                    sb.AppendLine(@"/!\ ERROR /!\");
-                    sb.AppendLine(@"/!\ ERROR while enumerating directory: " + directory);
-                    sb.AppendLine(ex.ToString());
-                    sb.AppendLine(@"/!\ ERROR /!\");
-                    sb.AppendLine();
-                    Console.WriteLine(sb.ToString());
-                }
-            });
         }
-    }
-
+    });
 }
 
 void ExtractFacesFromImage(string source, string destination, CommandLineArgs args)
@@ -522,4 +477,61 @@ static Bitmap ImageOrientation(IReadOnlyList<MetadataExtractor.Directory> direct
     }
 
     return img;
+}
+
+// Adapted from: https://stackoverflow.com/questions/929276/how-to-recursively-list-all-the-files-in-a-directory-in-c
+static IEnumerable<string> GetFiles(string path)
+{
+    Queue<string> directoriesQueue = new Queue<string>();
+    directoriesQueue.Enqueue(path);
+    while (directoriesQueue.Count > 0)
+    {
+        path = directoriesQueue.Dequeue();
+        
+        try
+        {
+            foreach (string subDir in System.IO.Directory.GetDirectories(path))
+            {
+                directoriesQueue.Enqueue(subDir);
+            }
+        }
+        catch (Exception ex)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine();
+            sb.AppendLine(@"/!\ ERROR /!\");
+            sb.AppendLine(@"/!\ ERROR while enumerating directory: " + path);
+            sb.AppendLine(ex.ToString());
+            sb.AppendLine(@"/!\ ERROR /!\");
+            sb.AppendLine();
+            Console.WriteLine(sb.ToString());
+        }
+
+        IEnumerable<string> files = null;
+        try
+        {
+            files = System.IO.Directory.GetFiles(path).Where(_ => _.ToLower().EndsWith(".jpg")
+                                                                    || _.ToLower().EndsWith(".jpeg")
+                                                                    || _.ToLower().EndsWith(".png"));
+        }
+        catch (Exception ex)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine();
+            sb.AppendLine(@"/!\ ERROR /!\");
+            sb.AppendLine(@"/!\ ERROR while enumerating files in a directory: " + path);
+            sb.AppendLine(ex.ToString());
+            sb.AppendLine(@"/!\ ERROR /!\");
+            sb.AppendLine();
+            Console.WriteLine(sb.ToString());
+        }
+        
+        if (files != null)
+        {
+            foreach(string file in files) 
+            {
+                yield return file;
+            }
+        }
+    }
 }
